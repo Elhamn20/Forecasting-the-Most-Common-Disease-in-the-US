@@ -1,0 +1,104 @@
+
+#Final project: Final Report time series Project time series analysis Fall22
+#Elham-Nasarian
+#US-heart-failure-cases(1981-2020)
+
+library(astsa)
+
+#Read the data into R
+USCVD <- read.csv("C:\\Users\\elhamn20\\Documents\\fall2022\\Applied time sries\\final project\\FINALREPORT\\USCVD.csv")
+death <- USCVD$death
+date <- USCVD$date
+
+#plot the data
+tsplot(date, death)
+
+#non-stationary time series
+# Compute log death
+death.log <- log(death)
+tsplot(date, death.log)
+
+# This series has a nonstationary trend.
+# Let's compute the first-order difference to remove the trend.
+death.diff.log <- diff(death.log)
+tsplot( date[1:38], death.diff.log)
+
+# Let us take a look at the sample ACF and sample PACF
+acf(death.diff.log, lag.max = 40)
+pacf(death.diff.log, lag.max = 40)
+
+# Now let's loop through several possible models to search for the best model
+n = length(death.log)
+max.p = 1
+max.d = 1
+max.q = 4
+max.P = 5
+max.D = 1
+max.Q = 6
+BIC.array =array(NA,dim=c(max.p+1,max.d+1,max.q+1,max.P+1,max.D+1,max.Q+1))
+AIC.array =array(NA,dim=c(max.p+1,max.d+1,max.q+1,max.P+1,max.D+1,max.Q+1))
+best.bic <- 1e8
+x.ts = death.log
+for (p in 0:max.p) for(d in 0:max.d) for(q in 0:max.q) 
+  for (P in 0:max.P) for(D in 0:max.D) for(Q in 0:max.Q) 
+  {
+    # This is a modification of a function originally from the book:
+    # Cowpertwait, P.S.P., Metcalfe, A.V. (2009), Introductory Time 
+    # Series with R, Springer.
+    # Modified by M.A.R. Ferreira (2016, 2020).
+    cat("p=",p,", d=",d,", q=",q,", P=",P,", D=",D,", Q=",Q,"\n")
+    fit <- tryCatch(
+      {  arima(x.ts, order = c(p,d,q),  
+               seas = list(order = c(P,D,Q), 
+                           frequency(x.ts)),method="CSS-ML")
+      },
+      error = function(cond){
+        message("Original error message:")
+        message(cond)
+        # Choose a return value in case of error
+        return(NA)
+      }
+    )
+    condition = !is.na(fit)
+    if(length(condition)>1)condition = all(condition) 
+    if(condition) { 
+      number.parameters <- length(fit$coef) + 1
+      BIC.array[p+1,d+1,q+1,P+1,D+1,Q+1] = -2*fit$loglik + log(n)*number.parameters
+      AIC.array[p+1,d+1,q+1,P+1,D+1,Q+1] = -2*fit$loglik + 2*number.parameters
+      if (BIC.array[p+1,d+1,q+1,P+1,D+1,Q+1] < best.bic) 
+      {
+        best.bic <- BIC.array[p+1,d+1,q+1,P+1,D+1,Q+1]
+        best.fit <- fit
+        best.model <- c(p,d,q,P,D,Q) 
+      }
+    }
+  }
+best.bic
+best.fit
+best.model
+
+# Let's perform model diagnostics for the ARIMA(0,1,1)x(2,1,3)_12 model
+# with the sarima function:
+sarima(death.log,0,0,0,0,1,0,1)
+
+# Let's perform forecasting for 5 year using the ARIMA(0,1,1)x(2,1,3)_12 model:
+death.log.for <- sarima.for(death.log,5,0,0,0,0,1,0,1)
+
+# Here are predictions for the USCVD time series
+exp(death.log.for$pred)
+
+# Here are 95% prediction intervals for the USCVD time series
+# Lower bounds
+exp(death.log.for$pred - 1.96*death.log.for$se)
+# Upper bounds
+exp(death.log.for$pred + 1.96*death.log.for$se)
+```
+
+
+
+---
+title: file.R
+author: elhamn20
+date: '2022-12-07'
+
+---
